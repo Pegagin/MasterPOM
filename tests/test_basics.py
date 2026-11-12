@@ -73,3 +73,13 @@ def test_release_dates_respected():
     held = simulate(inst, LFT, baseline=base, no_early_start=True)
     assert check_feasible(inst, held.start) == []
     assert (held.start >= base).all()
+
+
+def test_save_load_baseline_roundtrip(tmp_path):
+    from rcpsp_gp.baseline import load_baseline, save_baseline
+    inst = parse_sm(TOY)
+    s = serial_sgs(inst)
+    f = save_baseline(tmp_path / "sub" / "toy.json", inst, s, "lft")
+    d = load_baseline(f)
+    assert (d["start"] == s).all()
+    assert d["makespan"] == makespan(inst, s) and d["method"] == "lft"
