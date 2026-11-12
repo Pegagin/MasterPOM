@@ -83,3 +83,24 @@ def test_save_load_baseline_roundtrip(tmp_path):
     d = load_baseline(f)
     assert (d["start"] == s).all()
     assert d["makespan"] == makespan(inst, s) and d["method"] == "lft"
+
+
+def test_parse_name():
+    from rcpsp_gp.split import parse_name
+    assert parse_name("j3021_4") == (21, 4)
+    assert parse_name("j301_10") == (1, 10)
+    with pytest.raises(ValueError):
+        parse_name("toy")
+
+
+def test_split_j30_is_stratified():
+    from collections import Counter
+    from rcpsp_gp.split import parse_name, split_instances
+    folder = Path(__file__).parent / "data" / "j30"
+    if not folder.exists():
+        pytest.skip("J30 data not available")
+    train, test = split_instances(folder)
+    assert len(train) == len(test) == 240
+    assert not set(train) & set(test)
+    assert set(Counter(parse_name(f.stem)[0] for f in train).values()) == {5}
+    assert set(Counter(parse_name(f.stem)[0] for f in test).values()) == {5}
