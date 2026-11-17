@@ -37,6 +37,10 @@ During **training** the pool is the GP population. It learns from the what-if sc
 breeds after every project (or after every disruption). During **testing** the evolved
 heuristics are frozen and compared with the standard rules on the same disruption streams.
 
+Everything can be run from the command line or from a **browser app** (Streamlit) with
+explanations for every setting, live progress, result charts, expression trees of the evolved
+heuristics and Gantt charts of single runs. See [Using the app](#using-the-app).
+
 ---
 
 ## Setup
@@ -78,26 +82,61 @@ python -m pytest -q
 For a quick try, add `--limit-projects 4` to both commands and `--population-size 16` to
 training. `--help` lists every option.
 
-### Graphical interface
+For a quick start in the browser instead, see the next section.
 
-Everything above is also available in a browser UI:
+---
+
+## Using the app
+
+### Start and stop
 
 ```bash
+source .venv/bin/activate
 streamlit run app.py
 ```
 
-| Page | What it does |
-|---|---|
-| **Home** | How to use the app, the key ideas (plan, disruptions, heuristics, GP, metrics) and what data, baselines, heuristics and results exist |
-| **Train** | All training settings as form fields; live progress bar and fitness chart; shows and saves the best heuristics |
-| **Heuristics** | Each evolved heuristic as a readable formula and an expression tree (terminals coloured by what they describe), the terminals the best heuristics rely on, and the training progress |
-| **Evaluate** | Pick a heuristics file (its training settings become the defaults), standard rules, single and/or pool; runs the control check and all scenarios, then shows the results |
-| **Results** | Opens any CSV in `results/`, with filters by method, fp, ATR and instance: summary table, bar chart, heatmap per disruption setting, head-to-head with Wilcoxon test, GP-pool usage |
-| **Schedule viewer** | Runs one project with one method and shows the baseline plan and what actually happened as Gantt charts (interrupted and lost work highlighted, disrupted days shaded), resource availability vs usage, and every repair and disruption |
+The app opens at <http://localhost:8501>. Stop it with `Ctrl+C` in the terminal.
 
-Every setting has a short tooltip, and each group of settings has an *About these settings*
-box with a longer explanation. The UI calls the same code as the scripts, so files saved
-from either one can be used by the other.
+* After changing files in `rcpsp_gp/`, **restart** the app: Streamlit reloads the page files
+  automatically but may keep an old copy of the library in memory (symptom: an `ImportError`
+  for a function that clearly exists).
+* Changes to `app.py`, `app_pages/` or `ui/` show up after refreshing the browser.
+* If the port is taken, an old instance is still running; stop it or use
+  `streamlit run app.py --server.port 8502`.
+
+### Pages
+
+The pages are in the menu at the top.
+
+| Page | What you do there |
+|---|---|
+| **Home** | Read how the app works and the key ideas (plan, disruptions, heuristics, GP, metrics). Status cards show how many instances, cached baselines, heuristic files and result files exist |
+| **Train** | Set data, simulation and GP settings and press *Start training*. A progress bar and a live fitness chart show the run; afterwards the best heuristics are listed with their formulas, the tree of GP#1 is drawn, and the file is saved to `heuristics/` |
+| **Heuristics** | Pick a heuristics file to see what it was trained with, every heuristic as a readable formula (e.g. `LF − AvgRReq`), and one heuristic at a time as an **expression tree** with terminals coloured by what they describe (critical path, precedence network, resources, baseline/disruptions). A chart shows which terminals the best heuristics rely on, plus the training progress |
+| **Evaluate** | Pick a heuristics file (its training settings become the defaults), the standard rules, and whether to test each heuristic alone and/or as a pool. A control run checks that every method reproduces the baseline without disruptions; then all scenarios run and the results are shown and saved to `results/` |
+| **Results** | Open any results CSV and filter by method, fp, ATR or instance: summary table, bar chart, heatmap per disruption setting, head-to-head against any method with better/equal/worse counts and the Wilcoxon test, and how often each pool member was adopted. Download the filtered rows as CSV |
+| **Schedule viewer** | Choose an instance, disruption strength (fp, ATR, seed), simulation settings and a method (standard rule, one evolved heuristic, or the pool). Shows key numbers, Gantt charts of the baseline and of what actually happened (interrupted work orange, lost work red, disrupted days shaded), availability vs usage per resource, and tables of every repair and disruption |
+
+### Help in the app
+
+* Every setting has a **tooltip** (the help icon next to it).
+* Every group of settings has a collapsed **About these settings** box with a longer
+  explanation.
+* The Results page explains every column under *What the columns mean*; the Heuristics page
+  explains how to read a tree under *How to read a heuristic*.
+* All texts live in `ui/explainers.py`, so they can be edited in one place.
+
+### A first run (about 2 minutes)
+
+1. **Train**: set *Max instances* to 4 and *Population size* to 16, press *Start training*.
+2. **Heuristics**: select the new file and look at GP#1's formula and tree.
+3. **Evaluate**: select the file, set *Max instances* to 4, press *Run evaluation*.
+4. **Schedule viewer**: pick an instance and compare a standard rule (e.g. WCS) with
+   GP#1 or the pool on the same disruption seed.
+
+Full runs (all 120 resource-constrained J30 instances) take a few minutes each and keep the
+page busy until they finish. The app and the scripts read and write the same files, so
+heuristics trained in one can be evaluated in the other.
 
 ---
 
@@ -167,7 +206,8 @@ each. **The lowest value starts first**; ties go to the lower activity id.
 **Standard rules** (Chand Table 1): EST, EFT, LST, LFT, SPT, MTS, FIFO, GRPW, GRD,
 WCS (worst case slack) and ACS (average case slack).
 
-**Evolved heuristics** are expression trees, for example `sub(LF, AvgRReq)`, built from:
+**Evolved heuristics** are expression trees, for example `sub(LF, AvgRReq)` (shown in the
+app as the formula `LF − AvgRReq` and drawn as a tree on the *Heuristics* page), built from:
 
 * **Operators:** `add`, `sub`, `mul`, `div` (protected: x/0 = 0), `max`, `min`, `neg`
 * **Terminals (Chand Table 4)**, normalised to about 0..1:
@@ -284,9 +324,15 @@ rcpsp_gp/
 run_baseline.py     build / compare baselines
 run_training.py     train heuristics      -> heuristics/*.json
 run_evaluation.py   test and compare      -> results/*.csv
-app.py              Streamlit UI entry point (streamlit run app.py)
-app_pages/          one file per UI page (home, train, heuristics, evaluate, results, viewer)
-ui/                 shared UI code: settings widgets, charts, results view, help texts
+app.py              Streamlit app entry point: page navigation (streamlit run app.py)
+app_pages/          one file per page: home, train, heuristics, evaluate, results,
+                    schedule_viewer
+ui/
+  common.py         folders, cached loading, settings widgets with tooltips
+  explainers.py     every help text and explanation shown in the app
+  charts.py         Altair charts (fitness, Gantt, resources, terminals), Mermaid trees
+  results_view.py   results tables, charts and head-to-head tests
+.streamlit/         app configuration (usage statistics switched off)
 tests/              unit and integration tests (pytest)
 ```
 
