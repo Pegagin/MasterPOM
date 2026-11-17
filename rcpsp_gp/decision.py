@@ -43,6 +43,37 @@ CHAND_TERMINALS = ("ES", "EF", "LS", "LF", "TPC", "TSC", "RR", "AvgRReq", "MaxRR
 EXTRA_TERMINALS = ("PlannedStart", "Delay", "Remaining", "Interrupted", "TimePressure",
                    "AvailabilityRatio", "TimeToRecovery")
 
+# Which aspect of the problem each terminal describes (used for colours in the UI)
+TERMINAL_GROUPS = {
+    "critical path": ("ES", "EF", "LS", "LF"),
+    "precedence network": ("TPC", "TSC"),
+    "resources": ("RR", "AvgRReq", "MaxRReq", "MinRReq"),
+    "baseline and disruptions": EXTRA_TERMINALS,
+}
+TERMINAL_DESCRIPTIONS = {
+    "ES": "earliest start in the critical-path schedule",
+    "EF": "earliest finish in the critical-path schedule",
+    "LS": "latest start that still meets the lower bound (small = urgent)",
+    "LF": "latest finish that still meets the lower bound (small = urgent)",
+    "TPC": "number of direct and indirect predecessors",
+    "TSC": "number of direct and indirect successors (large = much work depends on it)",
+    "RR": "share of resource types the activity needs",
+    "AvgRReq": "requirement / currently known availability, averaged over resources",
+    "MaxRReq": "requirement / currently known availability, the tightest resource",
+    "MinRReq": "requirement / currently known availability, the loosest resource",
+    "PlannedStart": "start day in the baseline plan",
+    "Delay": "how many days the activity is already behind its baseline start",
+    "Remaining": "remaining duration (shorter after a resumed interruption)",
+    "Interrupted": "1 if a disruption paused the activity before, else 0",
+    "TimePressure": "latest start minus the current day (small or negative = urgent)",
+    "AvailabilityRatio": "today's availability / capacity of the resources it needs",
+    "TimeToRecovery": "days until all its resources are back at full capacity",
+}
+
+
+def terminal_group(name: str) -> str:
+    return next(group for group, names in TERMINAL_GROUPS.items() if name in names)
+
 
 class DecisionView:
     """The candidates of one scheduling decision plus read access to the project state.

@@ -93,6 +93,82 @@ class EvolvedHeuristic:
         return self.name
 
 
+# ------------------------------------------------------------------------------ display
+OPERATOR_SYMBOLS = {"add": "+", "sub": "−", "mul": "×", "div": "÷"}
+
+
+def infix_formula(tree: gp.PrimitiveTree) -> str:
+    """Readable formula, e.g. ``sub(LF, AvgRReq)`` -> ``LF − AvgRReq``.
+
+    ``÷`` is protected division (x ÷ 0 = 0); ``−x`` is negation."""
+    def render(index: int) -> Tuple[str, int]:
+        node = tree[index]
+        if isinstance(node, gp.Terminal):
+            return str(node.value), index + 1
+        arguments, next_index = [], index + 1
+        for _ in range(node.arity):
+            text, next_index = render(next_index)
+            arguments.append(text)
+        if node.name == "neg":
+            operand = arguments[0]
+            return (f"−({operand})" if operand.startswith("−") else f"−{operand}"), next_index
+        if node.name in ("max", "min"):
+            return f"{node.name}({arguments[0]}, {arguments[1]})", next_index
+        return f"({arguments[0]} {OPERATOR_SYMBOLS[node.name]} {arguments[1]})", next_index
+
+    formula, _ = render(0)
+    if formula.startswith("(") and formula.endswith(")"):
+        depth = 0
+        for position, character in enumerate(formula):
+            depth += {"(": 1, ")": -1}.get(character, 0)
+            if depth == 0 and position < len(formula) - 1:
+                break                       # outer brackets do not wrap the whole formula
+        else:
+            formula = formula[1:-1]
+    return formula
+
+
+def tree_to_mermaid(tree: gp.PrimitiveTree, terminal_classes: Optional[Dict[str, str]] = None,
+                    class_styles: Optional[Dict[str, str]] = None) -> str:
+    """Mermaid flowchart of the expression tree: operators as circles, terminals as boxes.
+
+    ``terminal_classes`` maps a terminal name to a class name and ``class_styles`` maps a
+    class name to a Mermaid style such as ``fill:#cfe0f1,stroke:#4c78a8``."""
+    terminal_classes = terminal_classes or {}
+    nodes, edges, labels = gp.graph(tree)
+    lines = ["flowchart TD"]
+    used_classes: Dict[str, List[str]] = {}
+    for node in nodes:
+        label = str(labels[node])
+        if isinstance(tree[node], gp.Terminal):
+            lines.append(f'  n{node}["{label}"]')
+            used_classes.setdefault(terminal_classes.get(label, "terminal"), []).append(f"n{node}")
+        else:
+            symbol = OPERATOR_SYMBOLS.get(label, "−" if label == "neg" else label)
+            lines.append(f'  n{node}(("{symbol}"))')
+            used_classes.setdefault("operator", []).append(f"n{node}")
+    lines += [f"  n{parent} --- n{child}" for parent, child in edges]
+    for class_name, style in (class_styles or {}).items():
+        if class_name in used_classes:
+            lines.append(f"  classDef {class_name} {style}")
+            lines.append(f"  class {','.join(used_classes[class_name])} {class_name}")
+    return "\n".join(lines)
+
+
+def tree_depth(tree: gp.PrimitiveTree) -> int:
+    return int(tree.height)
+
+
+def terminal_usage(heuristics: Sequence[EvolvedHeuristic]) -> Dict[str, int]:
+    """How often each terminal occurs over all given heuristics."""
+    counts: Dict[str, int] = {}
+    for heuristic in heuristics:
+        for node in heuristic.tree:
+            if isinstance(node, gp.Terminal):
+                counts[str(node.value)] = counts.get(str(node.value), 0) + 1
+    return counts
+
+
 # ------------------------------------------------------------------------------ files
 def save_heuristics(path, heuristics: Sequence[EvolvedHeuristic],
                     validation_scores: Optional[Sequence[float]] = None,

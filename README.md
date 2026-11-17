@@ -46,7 +46,7 @@ Requires Python 3.10+.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt        # numpy, ortools, deap, scipy, pytest
+pip install -r requirements.txt        # numpy, ortools, deap, scipy, streamlit, pytest
 ```
 
 ### Data
@@ -77,6 +77,27 @@ python -m pytest -q
 
 For a quick try, add `--limit-projects 4` to both commands and `--population-size 16` to
 training. `--help` lists every option.
+
+### Graphical interface
+
+Everything above is also available in a browser UI:
+
+```bash
+streamlit run app.py
+```
+
+| Page | What it does |
+|---|---|
+| **Home** | How to use the app, the key ideas (plan, disruptions, heuristics, GP, metrics) and what data, baselines, heuristics and results exist |
+| **Train** | All training settings as form fields; live progress bar and fitness chart; shows and saves the best heuristics |
+| **Heuristics** | Each evolved heuristic as a readable formula and an expression tree (terminals coloured by what they describe), the terminals the best heuristics rely on, and the training progress |
+| **Evaluate** | Pick a heuristics file (its training settings become the defaults), standard rules, single and/or pool; runs the control check and all scenarios, then shows the results |
+| **Results** | Opens any CSV in `results/`, with filters by method, fp, ATR and instance: summary table, bar chart, heatmap per disruption setting, head-to-head with Wilcoxon test, GP-pool usage |
+| **Schedule viewer** | Runs one project with one method and shows the baseline plan and what actually happened as Gantt charts (interrupted and lost work highlighted, disrupted days shaded), resource availability vs usage, and every repair and disruption |
+
+Every setting has a short tooltip, and each group of settings has an *About these settings*
+box with a longer explanation. The UI calls the same code as the scripts, so files saved
+from either one can be used by the other.
 
 ---
 
@@ -263,6 +284,9 @@ rcpsp_gp/
 run_baseline.py     build / compare baselines
 run_training.py     train heuristics      -> heuristics/*.json
 run_evaluation.py   test and compare      -> results/*.csv
+app.py              Streamlit UI entry point (streamlit run app.py)
+app_pages/          one file per UI page (home, train, heuristics, evaluate, results, viewer)
+ui/                 shared UI code: settings widgets, charts, results view, help texts
 tests/              unit and integration tests (pytest)
 ```
 

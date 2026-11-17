@@ -25,7 +25,7 @@ import numpy as np
 from .decision import DecisionView
 from .disruption import Disruption, DisruptionGenerator
 from .sgs import SCHEDULE_GENERATION_SCHEMES, Plan
-from .state import PREEMPTION_MODES, ActivityStatus, ProjectState
+from .state import PREEMPTION_MODES, ActivityStatus, ExecutedSegment, ProjectState
 
 PAUSE_ORDERS = ("baseline_order", "rule")
 SCORE_TYPES = ("makespan_increase", "makespan")
@@ -113,6 +113,7 @@ class ExecutionResult:
     available_capacity: np.ndarray      # [makespan, n_resources] availability as it turned out
     executed_usage: np.ndarray          # [makespan, n_resources] units actually used
     capacities: np.ndarray = field(repr=False, default=None)
+    segments: List[ExecutedSegment] = field(repr=False, default_factory=list)  # for Gantt charts
 
     @property
     def disruption_repairs(self) -> List[RepairRecord]:
@@ -248,7 +249,8 @@ def execute_project(instance, baseline_start: Optional[np.ndarray],
         interruption_count=state.interruption_count, wasted_work=state.wasted_work,
         available_capacity=state.available_capacity[:makespan].copy(),
         executed_usage=state.resource_usage[:makespan].copy(),
-        capacities=instance.capacities.copy())
+        capacities=instance.capacities.copy(),
+        segments=state.executed_segments())
 
 
 def run_scenario(scenario, heuristics: Union[HeuristicPool, Sequence],

@@ -1,8 +1,9 @@
 """Mutable state of a project while it is being executed day by day."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import IntEnum
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 
@@ -17,6 +18,19 @@ class ActivityStatus(IntEnum):
     WAITING = 0      # not started yet, or paused by a disruption and waiting to continue
     RUNNING = 1
     FINISHED = 2
+
+
+@dataclass(frozen=True)
+class ExecutedSegment:
+    """A stretch of days an activity actually ran.
+
+    ``outcome`` is ``completed`` (ran to the end), ``paused`` (interrupted, work kept and
+    resumed later) or ``lost`` (interrupted and restarted, work wasted).
+    """
+    activity: int
+    start_day: int
+    end_day: int
+    outcome: str
 
 
 class ProjectState:
@@ -47,6 +61,7 @@ class ProjectState:
         self.was_interrupted = np.zeros(n_activities, dtype=bool)
         self.interruption_count = 0
         self.wasted_work = 0           # activity-days lost to restarts
+        self.interrupted_segments: List[ExecutedSegment] = []
 
         if self.baseline_start is not None:
             self.planned_start = self.baseline_start.astype(np.int64).copy()
@@ -59,8 +74,18 @@ class ProjectState:
     def copy(self) -> "ProjectState":
         clone = ProjectState.__new__(ProjectState)
         for name, value in self.__dict__.items():
-            setattr(clone, name, value.copy() if isinstance(value, np.ndarray) else value)
+            needs_copy = isinstance(value, (np.ndarray, list))
+            setattr(clone, name, value.copy() if needs_copy else value)
         return clone
+
+    def executed_segments(self) -> List[ExecutedSegment]:
+        """Every stretch of work so far: interrupted ones plus the current/last run."""
+        segments = list(self.interrupted_segments)
+        for activity in np.flatnonzero(self.status != ActivityStatus.WAITING):
+            if self.finish_day[activity] > self.segment_start_day[activity]:
+                segments.append(ExecutedSegment(int(activity), int(self.segment_start_day[activity]),
+                                                int(self.finish_day[activity]), "completed"))
+        return segments
 
     def ensure_days(self, n_days: int) -> None:
         capacities = self.instance.capacities
@@ -132,6 +157,10 @@ class ProjectState:
         if preemption_mode not in PREEMPTION_MODES:
             raise ValueError(f"preemption_mode must be one of {PREEMPTION_MODES}")
         self.resource_usage[day:self.finish_day[activity]] -= self.instance.requirements[activity]
+        if day > self.segment_start_day[activity]:
+            outcome = "paused" if preemption_mode == "resume" else "lost"
+            self.interrupted_segments.append(
+                ExecutedSegment(activity, int(self.segment_start_day[activity]), day, outcome))
         if preemption_mode == "resume":
             self.remaining_duration[activity] = self.finish_day[activity] - day
         else:

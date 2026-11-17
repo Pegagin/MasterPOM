@@ -122,9 +122,13 @@ def result_row(scenario: Scenario, method: Method, result: ExecutionResult,
 
 def evaluate_methods(methods: Sequence[Method], scenarios: Sequence[Scenario],
                      settings: SimulationSettings = SimulationSettings(),
-                     log: Optional[Callable[[str], None]] = print) -> List[Dict]:
-    """Run every method on every scenario; returns one row per (scenario, method)."""
+                     log: Optional[Callable[[str], None]] = print,
+                     progress: Optional[Callable[[int, int], None]] = None) -> List[Dict]:
+    """Run every method on every scenario; returns one row per (scenario, method).
+
+    ``progress(done, total)`` is called after every scenario (used by the UI)."""
     log = log or (lambda message: None)
+    progress = progress or (lambda done, total: None)
     rows = []
     started = time.perf_counter()
     for index, scenario in enumerate(scenarios, start=1):
@@ -133,6 +137,7 @@ def evaluate_methods(methods: Sequence[Method], scenarios: Sequence[Scenario],
             rows.append(result_row(scenario, method, result, settings))
         log(f"scenario {index:>3}/{len(scenarios)} {scenario.label:<45} "
             f"({time.perf_counter() - started:6.1f}s)")
+        progress(index, len(scenarios))
     return rows
 
 

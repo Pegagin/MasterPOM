@@ -173,8 +173,19 @@ def train_heuristics(training_scenarios: Sequence[Scenario],
                      validation_scenarios: Sequence[Scenario],
                      simulation_settings: SimulationSettings = SimulationSettings(),
                      training_settings: TrainingSettings = TrainingSettings(),
-                     log: Optional[Callable[[str], None]] = print) -> TrainingResult:
+                     log: Optional[Callable[[str], None]] = print,
+                     progress: Optional[Callable[[str, int, int, List[Dict]], None]] = None
+                     ) -> TrainingResult:
+    """Train, validate and return the best heuristics.
+
+    ``progress(phase, done, total, history)`` is called after every training project
+    (phase ``"training"``) and every validated candidate (phase ``"validation"``); the UI
+    uses it for progress bars and the live fitness chart.
+    """
     log = log or (lambda message: None)
+    progress = progress or (lambda phase, done, total, history: None)
+    total_projects = training_settings.epochs * len(training_scenarios)
+    projects_done = 0
     random.seed(training_settings.seed)
     primitive_set = build_primitive_set(terminal_names(training_settings.use_extra_terminals))
     pool = EvolvingHeuristicPool(primitive_set, training_settings)
@@ -191,6 +202,8 @@ def train_heuristics(training_scenarios: Sequence[Scenario],
             log(f"epoch {epoch} project {index:>3}/{len(order)} {scenario.label:<45} "
                 f"repairs={len(result.repairs):>3} generation={pool.generation:>4} "
                 f"last best fitness={best:7.2f} ({time.perf_counter() - started:6.1f}s)")
+            projects_done += 1
+            progress("training", projects_done, total_projects, pool.history)
 
     candidates: Dict[str, gp.PrimitiveTree] = dict(pool.generation_champions)
     for tree in pool.population:
@@ -201,10 +214,11 @@ def train_heuristics(training_scenarios: Sequence[Scenario],
     log(f"validating {len(candidates)} candidate heuristics on "
         f"{len(validation_scenarios)} scenarios ...")
     scored = []
-    for tree in candidates.values():
+    for done, tree in enumerate(candidates.values(), start=1):
         heuristic = EvolvedHeuristic(tree, primitive_set)
         scored.append((mean_realised_score(heuristic, validation_scenarios, simulation_settings),
                        heuristic.size, heuristic.expression, heuristic))
+        progress("validation", done, len(candidates), pool.history)
     scored.sort(key=lambda entry: entry[:3])          # score, then smaller tree, then text
     best = scored[:training_settings.top_k]
     log(f"training finished in {time.perf_counter() - started:.1f}s")
