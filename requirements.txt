@@ -1,4 +1,5 @@
 numpy
 pytest
 ortools
-# next steps: deap
+deap
+scipy

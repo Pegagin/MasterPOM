@@ -5,3 +5,5 @@ __pycache__/
 **/data/*
 !tests/data/toy.sm
 baselines/
+heuristics/
+results/

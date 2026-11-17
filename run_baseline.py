@@ -57,14 +57,14 @@ def main():
                                               seed=args.seed, gap=args.gap)
         else:
             best = random_sampling_baseline(inst, n_samples=args.samples, seed=args.seed)
-            status, bound = "-", inst.lb
+            status, bound = "-", inst.lower_bound
         if args.save:
             save_baseline(Path(args.save) / f"{inst.name}.json", inst, best,
                           args.method, status, bound)
         ok = not check_feasible(inst, best)
         dev = pct_dev_lb(inst, best)
         devs.append(dev)
-        print(f"{f.stem:<14}{inst.n_jobs:>5}{inst.lb:>6}{makespan(inst, lft):>6}"
+        print(f"{f.stem:<14}{inst.n_activities:>5}{inst.lower_bound:>6}{makespan(inst, lft):>6}"
               f"{makespan(inst, best):>6}{dev:>9.2f}{bound:>7}  {status:<9} {'yes' if ok else 'NO'}")
 
     if len(devs) > 1:
